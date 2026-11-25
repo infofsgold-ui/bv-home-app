@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://script.google.com">
   <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-  <script>window.BV_EXEC_URL='https://script.google.com/macros/s/AKfycbxkliFqo-rP3ObzoeNWmCnrSbI-eLzrI92fAlZopMMToVdrRWXNNLZpdW3eZL0Y9qIHUg/exec';window.BV_BUILD='88d2e69f48';</script>
+  <script>window.BV_EXEC_URL='https://script.google.com/macros/s/AKfycbxkliFqo-rP3ObzoeNWmCnrSbI-eLzrI92fAlZopMMToVdrRWXNNLZpdW3eZL0Y9qIHUg/exec';window.BV_BUILD='0d7f689e84';</script>
   <script>/* Bản tĩnh trên GitHub Pages: thay google.script.run bằng fetch tới cổng doPost của Apps Script.
    Gửi text/plain để trình duyệt không cần hỏi trước (CORS preflight). */
 (function () {
@@ -1799,7 +1799,7 @@ button.bm-tx{cursor:pointer}
             <button class="tab" data-tab="invoices">Hóa đơn đã xuất</button>
           </div>
           <div data-pane="receipt">
-            <div class="card-head" style="margin-bottom:10px"><div><h2>Nhập dữ liệu Thu tiền</h2><div class="sub">Nhập đúng “Mã SP” — hệ thống tự điền tên khách hàng & hình thức thanh toán, bạn chỉ cần nhập số tiền và đợt thu.</div></div></div>
+            <div class="card-head" style="margin-bottom:10px"><div><h2>Nhập dữ liệu Thu tiền</h2><div class="sub">Nhập đúng “Mã SP” — hệ thống tự điền tên khách hàng & hình thức thanh toán, bạn chỉ cần nhập số tiền và đợt thu.</div></div><button class="btn ghost sm" type="button" onclick="openImport('saleReceipts')">Nhập từ Excel</button></div>
             <form id="bdRcForm" class="form-grid"></form>
             <div id="bdRcInfo" style="margin-top:18px"></div>
           </div>
@@ -3668,6 +3668,7 @@ async function downloadImportTemplate(kind) {
     : kind === 'payments' ? [[], ['Hình thức']].concat(Object.values(METHOD).map(m => [m])) : d.extra ? d.extra(info) : [];
   const dm = XLSX.utils.aoa_to_sheet(lists.concat(extra)); dm['!cols'] = [{wch: 34}, {wch: 16}, {wch: 8}, {wch: 12}];
   XLSX.utils.book_append_sheet(wb, dm, 'Danh mục');
+  if (d.sheets) d.sheets(wb);
   XLSX.writeFile(wb, kind === 'meters' ? 'chi-so-dien-nuoc-' + $('imMonth').value + '.xlsx' : d.file);
 }
 /** File chỉ số có sẵn mọi căn của dự án trong tháng đang chọn, kèm chỉ số cũ; căn đã khóa cả điện và nước thì bỏ. */
@@ -5441,6 +5442,43 @@ IMPORT_DEF.saleContracts = {
     th: '<th>Mã SP</th><th>Khách hàng</th><th class="num">Giá trị HĐ</th><th class="num">Đã TT</th><th>Tiến độ</th><th>Thao tác</th>',
     cols: x => `<td><b>${esc(x.code)}</b><div class="muted small">${esc(x.school)}</div></td><td>${esc(x.name)}</td><td class="num">${x.value ? money(x.value) : ''}</td><td class="num">${x.paid ? money(x.paid) : ''}</td><td>${x.plan ? x.plan + ' đợt' : ''}</td>
       <td>${{CREATE: '<span class="chip cyan">Tạo HĐMB</span>', CONVERT: '<span class="chip yellow">Chuyển cọc → HĐMB</span>', NEWUNIT: '<span class="chip slate">Tạo mã SP + HĐMB</span>'}[x.action] || ''}</td>`
+  })
+};
+/* Nhập thu tiền chi tiết theo từng hợp đồng từ Excel (Kế toán dự án → Thu tiền). */
+IMPORT_DEF.saleReceipts = {
+  title: 'Nhập thu tiền theo hợp đồng từ Excel', sheet: 'ThuTien', fn: 'importSaleReceipts', file: 'mau-nhap-thu-tien-hop-dong.xlsx', schoolSel: 'bdfSchool',
+  tplNote: 'Có sẵn cột, hướng dẫn và sheet “Hợp đồng” liệt kê mọi HĐ của dự án đang xem, kèm số tiền còn phải thu',
+  notice: 'Mỗi dòng = <b>1 lần khách hàng trả tiền</b> cho 1 hợp đồng. Một hợp đồng có nhiều lần trả thì nhập nhiều dòng. ' +
+    'Xác định hợp đồng bằng <b>Mã SP</b> (hoặc <b>Số HĐ</b>), sau đó kiểm tra như khi nhập tay: tổng tiền không vượt giá trị HĐ hoặc KP bảo trì, kể cả khi cộng các dòng trong file. ' +
+    '“Loại tiền” để trống: tiền cọc nếu khách đang đặt cọc, ngược lại là tiền về theo HĐMB. “Đợt” để trống: tự gán đợt còn nợ sớm nhất. ' +
+    'Dòng <b>trùng</b> phiếu thu đã có (cùng hợp đồng, ngày, số tiền, loại tiền) bị bỏ qua để không nhập 2 lần.',
+  cols: [['Dự án', 'Tên hoặc mã dự án. Để trống = dự án chọn khi nhập'], ['Mã SP *', 'VD: A-1203. Trống thì phải có Số HĐ'], ['Số HĐ', 'VD: 125/2026/HĐMB. Dùng khi không nhập Mã SP'],
+    ['Ngày thu *', 'dd/mm/yyyy, ngày tiền về tài khoản / ngày nộp tiền mặt'], ['Số tiền (VNĐ) *', 'VD: 750000000'],
+    ['Loại tiền', 'Tiền cọc / Tiền về theo HĐMB / Kinh phí bảo trì / Lãi chậm thanh toán / Khác. Trống = tự xác định'],
+    ['Đợt', 'Số đợt trong tiến độ HĐ, VD: 2. Trống = đợt còn nợ sớm nhất'], ['Phương thức', 'Chuyển khoản / Tiền mặt / Khác. Trống = Chuyển khoản'],
+    ['Số chứng từ / UNC', 'Số UNC, số phiếu thu…'], ['Ghi chú', '']],
+  sample: ['', 'A-1203', '', '20/11/2026', '750000000', 'Tiền về theo HĐMB', '2', 'Chuyển khoản', 'UNC 123456', 'KH chuyển đợt 2'],
+  extra: () => [[], ['Loại tiền'], ...Object.values(bdC().receiptKinds || {DEPOSIT: 'Tiền cọc', INSTALLMENT: 'Tiền về theo HĐMB', MAINTENANCE: 'Kinh phí bảo trì', INTEREST: 'Lãi chậm thanh toán', OTHER: 'Khác'}).map(x => [x]),
+    [], ['Phương thức'], ['Chuyển khoản'], ['Tiền mặt'], ['Khác']],
+  /* Sheet tra cứu: hợp đồng hiện tại của dự án đang xem, để kế toán chép Mã SP / số tiền còn phải thu. */
+  sheets: wb => {
+    if (!BDS.data || !$('imSchool') || $('imSchool').value !== BDS.schoolId) return;
+    const C = bdC(), rows = BDS.data.contracts.filter(c => c.current && (c.stage === 'DEPOSIT' || c.stage === 'SPA' || c.stage === 'HANDED_OVER'))
+      .sort((a, b) => String(a.unitCode).localeCompare(String(b.unitCode), 'vi', {numeric: true}));
+    const aoa = [['Mã SP', 'Số HĐ', 'Khách hàng', 'Giai đoạn', 'Giá trị HĐ / tiền cọc', 'Đã thu', 'Còn phải thu', 'Đợt kế tiếp', 'Hạn đợt kế tiếp', 'Còn của đợt kế tiếp', 'KP bảo trì còn', 'Lãi chậm TT còn']]
+      .concat(rows.map(c => { const f = c.fin || {}, dep = c.stage === 'DEPOSIT';
+        return [c.unitCode, c.contractNo || '', custName(c), C.stages[c.stage] || c.stage, dep ? c.depositAmount : c.value, f.paid || 0, dep ? Math.max(0, c.depositAmount - (f.paid || 0)) : f.remaining || 0,
+          f.next ? (f.next.title || 'Đợt ' + f.next.no) : '', f.next && f.next.due ? fmtD(f.next.due) : '', f.next ? f.next.remaining : '', f.maintRemaining || 0, f.interestDue || 0]; }));
+    const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = aoa[0].map((h, i) => ({wch: i === 2 ? 28 : Math.max(12, h.length + 2)}));
+    XLSX.utils.book_append_sheet(wb, ws, 'Hợp đồng');
+  },
+  after: () => bdsReload(),
+  render: (r, done) => ({
+    head: done
+      ? `<div class="notice">Đã nhập <b>${num(r.imported)}</b> phiếu thu cho <b>${num(r.contracts)}</b> hợp đồng, tổng <b>${money(r.importedTotal)}</b>${r.dup ? ' · bỏ ' + num(r.dup) + ' dòng vừa được người khác nhập' : ''}. Xem lại ở tab Sổ thu tiền.</div>`
+      : `<div class="notice ${r.invalid ? 'warn' : ''}"><b>${r.rows.length}</b> dòng · <b class="green-t">${r.valid}</b> hợp lệ (${num(r.contracts)} hợp đồng) · <b class="red-t">${r.invalid}</b> lỗi · tổng tiền hợp lệ <b>${money(r.total)}</b>. ${r.invalid ? 'Dòng lỗi sẽ bị bỏ qua — sửa trong file rồi kiểm tra lại, hoặc nhập trước các dòng hợp lệ.' : 'Bấm nút vàng để nhập.'}</div>`,
+    th: '<th>Mã SP</th><th>Khách hàng</th><th>Ngày thu</th><th>Loại tiền</th><th class="num">Số tiền</th>',
+    cols: x => `<td><b>${esc(x.code)}</b><div class="muted small">${esc(x.school)}</div></td><td>${esc(x.name)}</td><td>${x.date ? fmtD(x.date) : ''}</td><td>${esc(x.kindLabel)}${x.inst ? ' · đợt ' + x.inst : ''}</td><td class="num">${x.amount ? money(x.amount) : ''}</td>`
   })
 };
 qsa('#bdgMode button').forEach(b => b.addEventListener('click', () => {
