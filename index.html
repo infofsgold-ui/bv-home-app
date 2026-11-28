@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://script.google.com">
   <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-  <script>window.BV_EXEC_URL='https://script.google.com/macros/s/AKfycbxkliFqo-rP3ObzoeNWmCnrSbI-eLzrI92fAlZopMMToVdrRWXNNLZpdW3eZL0Y9qIHUg/exec';window.BV_BUILD='0d7f689e84';</script>
+  <script>window.BV_EXEC_URL='https://script.google.com/macros/s/AKfycbxkliFqo-rP3ObzoeNWmCnrSbI-eLzrI92fAlZopMMToVdrRWXNNLZpdW3eZL0Y9qIHUg/exec';window.BV_BUILD='49eef58b58';window.BV_SW='sw.js';window.BV_SW_SCOPE='./';</script>
   <script>/* Bản tĩnh trên GitHub Pages: thay google.script.run bằng fetch tới cổng doPost của Apps Script.
    Gửi text/plain để trình duyệt không cần hỏi trước (CORS preflight). */
 (function () {
@@ -39,7 +39,7 @@
   function applyLogo(css) { var s = document.getElementById('logoCss'); if (s) s.remove(); if (css) document.head.insertAdjacentHTML('beforeend', css); }
   try { applyLogo(localStorage.getItem('bv_logo_css') || ''); } catch (e) {}
   setTimeout(function () { call('brand', []).then(function (b) { if (!b) return; try { localStorage.setItem('bv_logo_css', b.css || ''); } catch (e) {} applyLogo(b.css || ''); }, function () {}); }, 300);
-  if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register(window.BV_SW || 'sw.js', {scope: window.BV_SW_SCOPE || './'}).catch(function () {}); });
 })();
 </script>
   <meta charset="utf-8">
@@ -1146,8 +1146,25 @@ button.bm-tx{cursor:pointer}
 @media(prefers-reduced-motion:reduce){.bm *{animation:none!important;transition:none!important}}
 @media(min-width:760px){body.bm-app .app{padding:24px 0}.bm{border-radius:28px;min-height:calc(100vh - 48px);overflow:hidden}.bm-nav{bottom:24px;border-radius:0 0 28px 28px}}
 </style>
+<style>
+/* ===== App riêng Kinh doanh BĐS (bm-solo): màn đăng nhập & nền theo tông xanh của App BĐS ===== */
+body.bm-solo{background:#E9EDF3}
+body.bm-solo .auth{background:radial-gradient(120% 60% at 100% 0%,#60A5FA 0%,transparent 55%),linear-gradient(160deg,#2563EB 0%,#1D4ED8 100%);flex-direction:column;align-items:center;justify-content:flex-end;padding:0}
+body.bm-solo .auth::before{content:"Doanh số, công nợ và hợp đồng trong tầm tay";flex:1;display:flex;align-items:flex-end;width:100%;max-width:480px;box-sizing:border-box;padding:48px 26px 28px;color:#fff;font:700 26px/1.25;text-wrap:balance Inter,system-ui,sans-serif;letter-spacing:-.4px}
+body.bm-solo .auth-card{max-width:480px;border:0;border-radius:28px 28px 0 0;padding:30px 24px calc(28px + env(safe-area-inset-bottom));box-shadow:0 -12px 40px -20px rgba(15,23,42,.35);font-family:Inter,system-ui,sans-serif}
+body.bm-solo .auth-logo{flex-direction:column;align-items:flex-start;gap:14px}
+body.bm-solo .auth-logo b{font-size:24px;color:#0F172A;letter-spacing:-.3px}
+body.bm-solo .auth-logo small{font-size:13px;color:#64748B}
+body.bm-solo .auth .btn{background:#2563EB;border-color:#2563EB;border-radius:14px;box-shadow:0 12px 24px -12px rgba(37,99,235,.7)}
+body.bm-solo .auth .btn.ghost{background:#EAF1FF;color:#2563EB;box-shadow:none}
+body.bm-solo .auth input:focus{border-color:#2563EB;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+body.bm-solo .auth a{color:#2563EB}
+body.bm-solo .auth input{border-radius:12px;height:48px}
+@media(min-width:760px){body.bm-solo .auth{justify-content:center;padding:24px}body.bm-solo .auth::before{flex:0;padding:0 4px 22px;max-width:430px}body.bm-solo .auth-card{border-radius:28px;box-shadow:0 24px 60px rgba(15,23,42,.12)}}
+</style>
 
   
+  <script>window.BV_APP = '';</script>
 </head>
 <body>
 <div class="scrim" onclick="toggleNav(false)"></div>
@@ -2326,7 +2343,22 @@ function renderNav() {
   qsa('.nav').forEach(b => b.addEventListener('click', () => go(b.dataset.page)));
 }
 const LOADERS = {};
+/* App riêng Kinh doanh BĐS (link /bds/ trên GitHub hoặc ?app=bds): đăng nhập xong vào thẳng App BĐS, không có web app đầy đủ. */
+const BV_BDS = window.BV_APP === 'bds';
+const BV_FULL_URL = BV_BDS && location.protocol === 'https:' && /github\.io$/.test(location.hostname) ? new URL('../', location.href).href : '';
+function homePage() {
+  const bm = NAV.find(n => n.id === 'bdsApp');
+  if (BV_BDS) return navAllowed(bm) ? 'bdsApp' : '';
+  const first = NAV.find(n => n.id && navAllowed(n));
+  return first ? first.id : 'students';
+}
+/* Mở bản đầy đủ: trong app riêng mở web app ở cửa sổ mới (giữ app BĐS), còn lại chuyển trang. */
+function bmOpenFull(page) {
+  if (BV_BDS && BV_FULL_URL) { window.open(BV_FULL_URL + '#' + (page || 'bdsReport'), '_blank', 'noopener'); return; }
+  go.free = true; go(page || 'bdsReport');
+}
 function go(page) {
+  if (BV_BDS && page !== 'bdsApp' && !go.free) { if (BV_FULL_URL) window.open(BV_FULL_URL + '#' + page, '_blank', 'noopener'); return; }
   const item = NAV.find(n => n.id === page);
   if (!item || !navAllowed(item)) return;
   qsa('.page').forEach(p => p.classList.add('hidden'));
@@ -5163,6 +5195,10 @@ function openShell() {
   $('chatFab').classList.remove('hidden'); setTimeout(refreshAlerts, 2500); clearInterval(window.__alertTimer); window.__alertTimer = setInterval(() => { refreshAlerts(); presencePing(); }, 60000);
   setTimeout(presencePing, 1500);
   qsa('input[type=date][name=ExpenseDate], input[type=date][name=MovementDate]').forEach(i => i.value = today());
+  if (BV_BDS) {
+    if (homePage()) { go('bdsApp'); return; }
+    toast('Tài khoản này không có quyền xem Kinh doanh BĐS.', 'error'); setTimeout(doLogout, 1500); return;
+  }
   const hash = location.hash.replace('#', '');
   const first = NAV.find(n => n.id && navAllowed(n));
   // Tài khoản chỉ xem báo cáo BĐS mở trên điện thoại → vào thẳng App BĐS di động.
@@ -5239,14 +5275,17 @@ function applyUserMeta() {
 }
 async function startApp() {
   $('authScreen').classList.add('hidden'); $('appShell').classList.remove('hidden');
-  if (APP_STARTED) { BOOT = await run('getBootstrap'); applyUserMeta(); renderNav(); fillSelects(); applyCaps(); go(NAV.find(n => n.id && navAllowed(n)).id); return; }
+  if (APP_STARTED) { BOOT = await run('getBootstrap'); applyUserMeta(); renderNav(); fillSelects(); applyCaps(); if (BV_BDS && !homePage()) { toast('Tài khoản này không có quyền xem Kinh doanh BĐS.', 'error'); setTimeout(doLogout, 1500); return; } go(homePage()); return; }
   APP_STARTED = true;
   await init();
 }
 // Khởi động: gọi ở cuối khối script nạp sau cùng (ScriptsBds.html) để mọi trang đã đăng ký xong trước khi mở ứng dụng.
 async function bootApp() {
   if (bootApp.done) return; bootApp.done = true;
-  setAuthType('PARENT');
+  if (BV_BDS) {
+    document.body.classList.add('bm-solo'); setAuthType('STAFF'); $('authTabs').classList.add('hidden');
+    const lg = document.querySelector('.auth-logo div'); if (lg) lg.innerHTML = '<b>BV-HOME BĐS</b><small>Báo cáo kinh doanh bất động sản</small>';
+  } else setAuthType('PARENT');
   if (!TOKEN) { showAuth('login'); return; }
   try { await startApp(); } catch (e) { APP_STARTED = false; }
 }
@@ -7208,7 +7247,7 @@ function bmHome() {
     <div class="bm-sec"><h3>Cảnh báo nhanh</h3><button type="button" onclick="bmGo('contracts','late')">Xem tất cả</button></div>
     ${ins.map((x, i) => `<button type="button" class="bm-ins" style="--i:${i}" onclick="${x[4]}"><span class="bm-ii ${x[0]}">${bmIc(x[1])}</span><div><b>${x[2]}</b><p>${x[3]}</p></div></button>`).join('')}
     <div class="bm-sec"><h3>Truy cập nhanh</h3></div>
-    <div class="bm-qa">${[['alert', 'Quá hạn', "bmGo('contracts','late')", 'red'], ['clock', 'Sắp đến hạn', "bmGo('contracts','soon')", 'amber'], ['build', 'Dự án', 'bmPickProject()', 'green'], ['full', 'Bản đầy đủ', "go('bdsReport')", 'violet']]
+    <div class="bm-qa">${[['alert', 'Quá hạn', "bmGo('contracts','late')", 'red'], ['clock', 'Sắp đến hạn', "bmGo('contracts','soon')", 'amber'], ['build', 'Dự án', 'bmPickProject()', 'green'], ['full', 'Bản đầy đủ', "bmOpenFull()", 'violet']]
       .map(([ic, l, fn, c]) => `<button type="button" onclick="${fn}"><span class="${c}">${bmIc(ic)}</span>${l}</button>`).join('')}</div>
     <div class="bm-sec"><h3>Tiền về gần đây</h3><button type="button" onclick="bmGo('analytics')">Phân tích</button></div>
     <div class="bm-card bm-list">${recent.length ? recent.map((r, i) => { const c = byCode[r.s + '|' + r.code]; return `<div class="bm-tx" style="--i:${i}"><span class="bm-txi" style="color:${BM_KIND_C[r.kind] || '#2563EB'};background:${(BM_KIND_C[r.kind] || '#2563EB')}14">${bmIc('cash')}</span>
@@ -7325,10 +7364,10 @@ function bmProfile() {
       ${item('build', 'Dự án đang xem', esc(bmProjName()), 'bmPickProject()')}
       ${item('refresh', 'Làm mới dữ liệu', 'Cập nhật lúc ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'), 'bmLoad(true)')}
       ${item('bell', 'Cảnh báo / thông báo', ALERTS && ALERTS.count ? num(ALERTS.count) + ' mục mới' : 'Không có mục mới', 'showAlerts()')}
-      ${full && navAllowed(full) ? item('full', 'Mở bản đầy đủ', 'Dashboard, dự án, hợp đồng trên máy tính', "go('bdsReport')") : ''}
+      ${full && navAllowed(full) ? item('full', 'Mở bản đầy đủ', BV_BDS ? 'Mở web app BV-HOME ở cửa sổ mới' : 'Dashboard, dự án, hợp đồng trên máy tính', "bmOpenFull()") : ''}
       ${item('user', 'Tài khoản & mật khẩu', 'Đổi mật khẩu đăng nhập', 'openAccountMenu()')}
     </div>
-    <div class="bm-card bm-tip">${bmIc('plus')}<div><b>Cài ra màn hình điện thoại</b><small>iPhone: Safari → Chia sẻ → Thêm vào MH chính. Android: Chrome → ⋮ → Thêm vào màn hình chính. Thêm <b>?open=bdsApp</b> vào cuối link web app trước khi cài để mở thẳng ứng dụng này.</small></div></div>
+    <div class="bm-card bm-tip">${bmIc('plus')}<div><b>Cài ra màn hình điện thoại</b><small>iPhone: Safari → Chia sẻ → Thêm vào MH chính. Android: Chrome → ⋮ → Thêm vào màn hình chính. ${BV_BDS ? 'Ứng dụng sẽ có biểu tượng riêng “BV-HOME BĐS”.' : 'Link cài riêng: <b>infofsgold-ui.github.io/bv-home-app/bds/</b>'}</small></div></div>
     <div class="bm-card bm-pl">${item('out', 'Đăng xuất', '', 'doLogout()', 'red')}</div>
     <div class="bm-ver">BV-HOME · Phiên bản ${esc(BOOT.version || '')}</div>`;
 }

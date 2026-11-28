@@ -1,0 +1,18 @@
+{
+  "name": "BV-HOME BĐS",
+  "short_name": "BV BĐS",
+  "description": "Báo cáo kinh doanh bất động sản BV-HOME: tổng quan, phân tích, hợp đồng và công nợ.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2563EB",
+  "theme_color": "#2563EB",
+  "lang": "vi",
+  "icons": [
+    {"src": "../icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "../icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "../icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
